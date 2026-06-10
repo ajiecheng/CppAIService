@@ -6,7 +6,7 @@ void ChatEntryHandler::handle(const http::HttpRequest& req, http::HttpResponse* 
 {
 
     std::string reqFile;
-    reqFile.append("../AIApps/ChatServer/resource/entry.html");
+    reqFile.append("AIApps/ChatServer/resource/entry.html");
     FileUtil fileOperater(reqFile);
     if (!fileOperater.isValid())
     {

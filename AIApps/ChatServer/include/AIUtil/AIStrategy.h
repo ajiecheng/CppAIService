@@ -5,9 +5,28 @@
 #include <iostream>
 #include <sstream>
 #include <memory>
+#include <fstream>
 
 #include "../../../../HttpServer/include/utils/JsonUtil.h"
 
+// 辅助函数：优先从环境变量读取 API Key，失败时回退到配置文件
+inline std::string readApiKey(const char* envName) {
+    const char* key = std::getenv(envName);
+    if (key && strlen(key) > 0) {
+        return std::string(key);
+    }
+    // 回退到家目录下的配置文件（避免密钥入库）
+    const char* home = std::getenv("HOME");
+    std::string confPath = home ? (std::string(home) + "/.cppaiservice/apikey.conf") : "AIApps/ChatServer/resource/apikey.conf";
+    std::ifstream conf(confPath);
+    if (conf.is_open()) {
+        std::string line;
+        if (std::getline(conf, line) && !line.empty()) {
+            return line;
+        }
+    }
+    throw std::runtime_error(std::string(envName) + " not found in env or config file!");
+}
 
 
 class AIStrategy {
@@ -37,9 +56,7 @@ class AliyunStrategy : public AIStrategy {
 
 public:
     AliyunStrategy() {
-        const char* key = std::getenv("DASHSCOPE_API_KEY");
-        if (!key) throw std::runtime_error("Aliyun API Key not found!");
-        apiKey_ = key;
+        apiKey_ = readApiKey("DASHSCOPE_API_KEY");
         isMCPModel = false;
     }
 
@@ -58,9 +75,7 @@ class DouBaoStrategy : public AIStrategy {
 
 public:
     DouBaoStrategy() {
-        const char* key = std::getenv("DOUBAO_API_KEY");
-        if (!key) throw std::runtime_error("DOUBAO API Key not found!");
-        apiKey_ = key;
+        apiKey_ = readApiKey("DOUBAO_API_KEY");
         isMCPModel = false;
     }
     std::string getApiUrl() const override;
@@ -78,9 +93,7 @@ class AliyunRAGStrategy : public AIStrategy {
 
 public:
     AliyunRAGStrategy() {
-        const char* key = std::getenv("DASHSCOPE_API_KEY");
-        if (!key) throw std::runtime_error("Aliyun API Key not found!");
-        apiKey_ = key;
+        apiKey_ = readApiKey("DASHSCOPE_API_KEY");
         isMCPModel = false;
     }
 
@@ -99,9 +112,7 @@ class AliyunMcpStrategy : public AIStrategy {
 
 public:
     AliyunMcpStrategy() {
-        const char* key = std::getenv("DASHSCOPE_API_KEY");
-        if (!key) throw std::runtime_error("Aliyun API Key not found!");
-        apiKey_ = key;
+        apiKey_ = readApiKey("DASHSCOPE_API_KEY");
         isMCPModel = true;
     }
 

@@ -1,163 +1,228 @@
-#  C++ AI应用开发项目 - AI应用服务平台 第二版
+# CppAIService — C++ AI 应用服务平台
+
+基于自研 C++ HTTP 框架构建的 AI 应用服务平台，支持**多模型对话、图像识别、语音合成（TTS）、RAG 检索增强、MCP 工具协议化、多会话隔离、异步消息队列**。
+
+## 项目架构
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    客户端层                           │
+│          Web 浏览器 / 命令行 / 第三方 SDK             │
+├─────────────────────────────────────────────────────┤
+│                  业务服务层（C++）                     │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐             │
+│  │ 对话服务  │ │ 图像识别  │ │ 语音服务  │             │
+│  │ ChatHandler│ │ImageRecog│ │ ASR/TTS  │             │
+│  └──────────┘ └──────────┘ └──────────┘             │
+│  ┌──────────────────────────────────────┐           │
+│  │    自研 HTTP Server（muduo 驱动）     │           │
+│  │    Router → Middleware → Session      │           │
+│  └──────────────────────────────────────┘           │
+├─────────────────────────────────────────────────────┤
+│                数据与消息层                           │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
+│  │  MySQL   │  │ RabbitMQ │  │  Session  │          │
+│  └──────────┘  └──────────┘  └──────────┘          │
+├─────────────────────────────────────────────────────┤
+│              推理与第三方平台层                        │
+│  阿里百炼 · 火山豆包 · 百度 TTS · ONNX Runtime       │
+└─────────────────────────────────────────────────────┘
+```
+
+## 核心功能
+
+| 模块 | 说明 |
+|------|------|
+| **多模型对话** | 策略模式 + 注册式工厂，支持阿里百炼（通义千问）、豆包等模型一键切换 |
+| **轻量级 MCP** | 配置化工具注册（`AIToolRegistry`）+ Prompt 协议化，实现两段式推理 |
+| **RAG 检索增强** | 基于阿里百炼知识库，支持知识库 ID 配置化接入 |
+| **图像识别** | ONNX Runtime + OpenCV DNN，MobileNetV2 本地推理 |
+| **语音合成（TTS）** | 集成百度 TTS（任务创建 → 轮询 → 回传 URL），支持参数化语速/音色 |
+| **多会话管理** | 单用户多会话隔离，`unordered_map<userId, map<sessionId, AIHelper>>` |
+| **异步消息入库** | RabbitMQ 承载持久化写库，同步写内存 + 异步入库，避免主线程阻塞 |
+| **CORS 中间件** | 内置跨域支持，可配置 |
+
+## 技术栈
+
+- **语言标准**：C++17
+- **构建系统**：CMake 3.10+ / Ninja
+- **HTTP 框架**：[自研 C++ HTTP Server](HttpServer/)（基于 muduo 网络库）
+- **数据库**：MySQL（通过 mysqlcppconn）
+- **消息队列**：RabbitMQ（SimpleAmqpClient）
+- **AI 推理**：libcurl（API 调用） + ONNX Runtime（本地推理）
+- **图像处理**：OpenCV 4.x
+- **语音**：百度语音 API
+- **加密**：OpenSSL
+
+## 目录结构
+
+```
+CppAIService/
+├── AIApps/ChatServer/          # AI 应用服务主程序
+│   ├── include/
+│   │   ├── ChatServer.h        # 服务入口
+│   │   ├── handlers/           # 请求处理器
+│   │   └── AIUtil/             # AI 核心模块
+│   │       ├── AIHelper.h      # 对话管理
+│   │       ├── AIStrategy.h    # 多模型策略
+│   │       ├── AIFactory.h     # 策略工厂
+│   │       ├── AIConfig.h      # MCP 配置
+│   │       ├── AIToolRegistry.h # 工具注册表
+│   │       ├── ImageRecognizer.h # 图像识别
+│   │       ├── AISpeechProcessor.h # 语音合成
+│   │       └── base64.h        # Base64 编解码
+│   ├── src/                    # 源码实现
+│   └── resource/               # 静态资源 & 配置文件
+├── HttpServer/                 # 自研 HTTP 框架
+│   ├── include/
+│   │   ├── http/               # HTTP 核心（请求/响应/上下文）
+│   │   ├── router/             # 路由系统
+│   │   ├── session/            # 会话管理
+│   │   ├── middleware/          # 中间件链
+│   │   ├── ssl/                # SSL/TLS
+│   │   └── utils/              # 工具（MySQL/文件/JSON）
+│   └── src/
+├── CMakeLists.txt              # 构建配置
+└── docs/                       # 文档
+```
+
+## 安装与编译
+
+### 环境要求
+
+- Ubuntu 20.04 / 22.04（或其他 Linux 发行版）
+- GCC 9+ 或 Clang 10+（支持 C++17）
+- CMake 3.10+
+- MySQL 8.0+
+- RabbitMQ 3.x
+
+### 安装依赖
+
+```bash
+# 基础工具链
+sudo apt update && sudo apt install -y build-essential cmake git ninja-build \
+    pkg-config curl wget
 
-> **本项目目前只在[知识星球](https://programmercarl.com/other/kstar.html)答疑并维护**。
+# 系统库
+sudo apt install -y libssl-dev libcurl4-openssl-dev libopencv-dev \
+    libmysqlclient-dev libprotobuf-dev protobuf-compiler libboost-all-dev
 
-在9月份我们发布了[C++AI应用服务平台（第一版）](https://programmercarl.com/other/project_http_ai.html) 这个项目。
+# MySQL Connector/C++
+sudo apt install -y libmysqlcppconn-dev
 
-当然刚发布，第二版就已经在路上了。
+# RabbitMQ
+sudo apt install -y librabbitmq-dev
+```
 
-**现在AI应用服务平台第二版（C++），正式发布**！
+### 编译 muduo（从源码）
 
-这次，在自研 [C++ HTTP 框架](https://programmercarl.com/other/project_http.html)上，**把多模型对话、RAG、轻量级 MCP、ASR/TTS、图像识别、消息队列异步化、会话多租户化 全部落地，并用策略模式 + 注册式工厂把“接什么模型、怎么调用、能否用工具”彻底解耦**。
+```bash
+cd /tmp
+git clone https://github.com/chenshuo/muduo.git
+cd muduo && mkdir -p build && cd build
+cmake -G Ninja ..
+ninja && sudo ninja install
+```
 
-第二版不是简单加功能，而是把AI 应用工程化做深做透。
+### 编译 SimpleAmqpClient（从源码）
 
-相对于[第一版](https://programmercarl.com/other/project_http_ai.html)，第二版我们优化了这些内容。
+```bash
+cd /tmp
+git clone https://github.com/alanxz/SimpleAmqpClient.git
+cd SimpleAmqpClient && mkdir -p build && cd build
+cmake -G Ninja ..
+ninja && sudo ninja install
+```
 
-![一图看懂优化点](https://file1.kamacoder.com/i/web/2025-10-14_16-51-35.jpg)
+### 安装 ONNX Runtime
 
-## 第二版核心技术点：
+从 [ONNX Runtime Releases](https://github.com/microsoft/onnxruntime/releases) 下载 Linux 预编译包，将 `.so` 文件放入 `/usr/local/lib` 并执行 `sudo ldconfig`。
 
-- **多模型适配（Strategy + Factory）**：统一抽象 `AIStrategy`，一键切换 **阿里百炼 / 百炼-RAG / 豆包 /（预留）本地 LLaMA/llama.cpp、GGUF**。
-- **轻量级 MCP 思想落地**：通过 **配置化工具注册（`AIToolRegistry`）+ Prompt 协议化** 实现“模型判断→工具调用→二次回答”的 **两段式推理**，对齐 **Model Context Protocol** 的核心理念。
-- **RAG 检索增强**：解析→分块→嵌入→ANN 检索（Faiss/Milvus 预留）→可选重排→**带引用回答**，支持 **知识库 ID** 配置化接入。
-- **多会话管理**：从 **单用户单会话** 升级为 **单用户多会话**，`unordered_map<userId, map<sessionId, AIHelper>>` 精准隔离上下文。
-- **语音链路（ASR/TTS）**：集成 **百度 TTS**（任务创建→轮询→回传 URL），ASR 接口封装预留；支持 **参数化语速/音色**。
-- **异步化与可靠性**：**RabbitMQ** 承载持久化写库，前台 **同步写内存、异步入库**，避免主线程阻塞；幂等/重试机制可扩展。
-- **全链路可维护**：`AIHelper` 重构，**对话/模型切换/消息入库** 一步到位；**配置驱动（`config.json`）** 管理工具清单与 Prompt 模板。
-- **容器化交付**：**独立 v1/v2 Docker 镜像**，MySQL + RabbitMQ 一键拉起；环境一致、上手即跑。
+### 编译项目
 
-## 本项目视频演示
+```bash
+git clone https://github.com/ajiecheng/CppAIService.git
+cd CppAIService
 
-![image](https://file1.kamacoder.com/i/web/2025-11-07_11-28-19.jpg)
+# CMake 配置（可选禁用某些模块）
+cmake -S . -B build -G Ninja
+# 自定义选项: -DBUILD_WITH_MUDUO=ON -DBUILD_WITH_ONNX=ON -DBUILD_WITH_AMQP=ON -DBUILD_WITH_MYSQL=ON
 
-![image](https://file1.kamacoder.com/i/web/2025-11-07_11-28-53.jpg)
+# 编译
+cmake --build build -j$(nproc)
+```
 
-![image](https://file1.kamacoder.com/i/web/2025-11-07_11-29-21.jpg)
+## 配置
 
-## 为什么市面上没有C++ AI应用项目？
+### 数据库
 
-大家会发现市面上，很少有 C++ AI应用开发的项目教程。
+在 [ChatServer.cpp](AIApps/ChatServer/src/ChatServer.cpp#L37) 中配置 MySQL 连接信息：
 
-因为C++ 没有成熟的 AI 框架封装（如 LangChain、FastAPI 那种现成的 SDK）。
+```cpp
+MysqlUtil::init("tcp://127.0.0.1:3306", "your_user", "your_password", "ChatHttpServer", 5);
+```
 
-相对于Java ，**Spring AI 在 Spring Boot 基础上已经封装的 各种AI 应用层框架**。
+### AI 模型 API Key
 
-可以一行配置 即可接入 ChatGPT、Claude、通义、文心等；
+API Key 通过环境变量或配置文件加载（优先环境变量）：
 
-还支持 Prompt 模板、工具调用（Function Calling）、RAG、向量检索；内置安全、配置、日志、监控体系；等等
+| 模型 | 环境变量 | 说明 |
+|------|----------|------|
+| 阿里百炼 | `DASHSCOPE_API_KEY` | [获取 Key](https://bailian.console.aliyun.com/) |
+| 火山豆包 | `DOUBAO_API_KEY` | [获取 Key](https://console.volcengine.com/) |
 
+如果环境变量未设置，程序会自动读取 `~/.cppaiservice/apikey.conf` 文件（第一行为 Key）。
 
-还能无缝集成 Spring Cloud、Spring Security、Redis、MySQL。
+### 百度 TTS
 
-换句话说： Spring AI 把“大模型调用”当作一种新的 Bean，让 Java 工程师能像调接口一样玩 AI。
+```bash
+export BAIDU_CLIENT_ID="your_client_id"
+export BAIDU_CLIENT_SECRET="your_client_secret"
+```
 
-大家看过的 不少 包装了各种高大上的名字的java项目，其实就是在 Spring AI 里的一个配置而已。
+### ONNX 模型
 
-而C++ 没有这种生态，以至于，大家在网上 基本找不到 C++ ai应用开发的教程。
+确保 [mobilenetv2-7.onnx](AIApps/ChatServer/resource/mobilenetv2-7.onnx) 和 [imagenet_classes.txt](AIApps/ChatServer/resource/imagenet_classes.txt) 存在于 `resource/` 目录下。
 
-因为啥都要自己写，一步一步自己造轮子，难度就上了一个台阶。
+## 运行
 
+```bash
+# 默认端口 80（需 root）
+sudo ./build/http_server
 
-## 架构图
+# 指定端口
+./build/http_server -p 8080
+```
 
-![](https://file1.kamacoder.com/i/web/2025-10-15_16-19-50.jpg)
+启动后访问 `http://localhost:8080` 进入"卡码AI助手"Web 界面。
 
-架构图展示了 自研 [C++ HTTP 服务框架](https://programmercarl.com/other/project_http.html) 如何将 AI 模型调用、图像识别、消息队列、数据库存储与多厂商模型 API 进行解耦，实现了高性能、可扩展、可私有化部署的 AI 应用平台。
+### API 路由
 
-整个系统从上到下可分为四层：
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/` `/entry` | 入口页面 |
+| POST | `/login` | 用户登录 |
+| POST | `/register` | 用户注册 |
+| POST | `/user/logout` | 用户登出 |
+| GET | `/chat` | 聊天页面 |
+| POST | `/chat/send` | 发送对话消息 |
+| POST | `/chat/send-new-session` | 新建会话并发送 |
+| GET | `/chat/sessions` | 获取会话列表 |
+| POST | `/chat/history` | 获取历史消息 |
+| POST | `/chat/tts` | 语音合成 |
+| GET | `/menu` | AI 功能菜单 |
+| GET | `/upload` | 图片上传页面 |
+| POST | `/upload/send` | 图片识别 |
 
-* 客户端层	用户通过 Web / 命令行 / 其他 SDK 发起请求（例如 AI 聊天、文档问答、图像识别等）
-* 业务服务层（C++ 框架核心）	提供对话服务、图像识别服务、用户管理服务，是整个平台的核心逻辑层
-* 数据与消息层	负责业务数据的存储、异步任务的转发与缓冲，提升系统稳定性与并发性能
-* 推理与第三方平台层	对接多家 AI 大模型（阿里云、百度智能云、火山引擎等）以及本地推理引擎（ONNXRuntime）
+## CMake 构建选项
 
-## 流程图
+| 选项 | 默认值 | 说明 |
+|------|--------|------|
+| `BUILD_WITH_MUDUO` | ON | 启用 muduo HTTP 服务 |
+| `BUILD_WITH_MYSQL` | ON | 启用 MySQL 支持 |
+| `BUILD_WITH_ONNX` | ON | 启用 ONNX Runtime 推理 |
+| `BUILD_WITH_AMQP` | ON | 启用 RabbitMQ 消息队列 |
 
-![](https://file1.kamacoder.com/i/web/2025-10-15_16-22-16.jpg)
+## License
 
-展示了整个系统从 客户端请求 → ChatServer 业务调度 → 多模型调用 → 异步消息入库 的全链路流程
-
-一、总体架构思路
-
-该系统基于[自研的 C++ HTTP 服务框架](https://programmercarl.com/other/project_http.html) 构建，是一个支持：
-
-* 多模型接入（GPT / 通义 / 豆包 / 百炼 / 百川）
-* 图像识别（ONNX + OpenCV）
-* 语音识别与合成（ASR/TTS）
-* 异步消息入库（RabbitMQ）
-* 多会话管理
-* MCP 工具协议化
-
-的完整 AI 应用服务平台。
-
-系统核心是 ChatServer，它负责：
-
-* 接收客户端请求；
-* 调用对应业务 Handler；
-* 根据类型分发到不同 AI 模块（聊天、图像识别、语音）；
-* 将结果异步入库或交由队列处理。
-
-## 做完这个项目你将收获什么？
-
-这个项目足够稀缺！
-
-当前 99% 的 AI 应用项目都是 Java / Python 实现的，而本项目使用 纯 C++ 构建完整 AI 服务平台。
-
-做完这个项目，你可以学会
-
-* **独立完成 C++ + 大模型 + RAG + 多模态 全链路开发**；
-* **理解底层 HTTP、线程池、异步消息、模型推理之间的真实数据流**；
-* **把“C++ 系统能力”和“AI 应用能力”结合在一起**。
-
-更具体一些，你会真正理解一个 AI 平台的完整架构：
-
-* 如何在 C++ 框架中封装 多模型策略层（GPT、通义、豆包、百炼）；
-* 如何实现类似 MCP（Model Context Protocol） 的上下文管理；
-* 如何用 RabbitMQ + 线程池 做异步入库和任务调度；
-* 如何接入 语音识别（ASR）+ 语音合成（TTS）；
-* 如何集成本地 ONNX 模型推理；
-* 如何设计 多会话隔离与上下文管理；
-* 如何让一个 AI 服务同时支持 云端模型与本地推理 模式。
-
-## 更详细内容
-
-本项目专栏和代码依然是只分享在[知识星球](https://programmercarl.com/other/kstar.html)里。
-
-详细的 各个文件的讲解：
-
-![](https://file1.kamacoder.com/i/web/2025-10-15_16-50-14.jpg)
-
-流程讲解：
-
-![](https://file1.kamacoder.com/i/web/2025-10-15_16-51-10.jpg)
-
-
-AI开发的各种细节
-
-![](https://file1.kamacoder.com/i/web/2025-10-15_17-21-26.jpg)
-
-项目难点强调：
-
-![](https://file1.kamacoder.com/i/web/2025-10-15_17-22-38.jpg)
-
-
-简历写法，做完项目可以直接写到简历上。
-
-![](https://file1.kamacoder.com/i/web/2025-10-15_17-24-19.jpg)
-
-那这个项目面试，都会有哪些问题，如何回答，都列出来了
-
-![](https://file1.kamacoder.com/i/web/2025-10-15_17-25-44.jpg)
-
-## 答疑
-
-本项目在[知识星球](https://programmercarl.com/other/kstar.html)里为 文字专栏形式，大家不用担心，看不懂，星球里每个项目有专属答疑群，任何问题都可以在群里问，都会得到解答：
-
-![](https://file1.kamacoder.com/i/web/2025-09-26_11-30-13.jpg)
-
-
-## 获取本项目专栏
-
-**本文档仅为星球内部专享，大家可以加入[知识星球](https://programmercarl.com/other/kstar.html)里获取，在星球置顶一**
-
+本项目基于 MIT License 开源，详见 [LICENSE](LICENSE)。

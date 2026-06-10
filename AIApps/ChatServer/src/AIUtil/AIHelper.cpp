@@ -48,9 +48,15 @@ std::string AIHelper::chat(int userId,std::string userName, std::string sessionI
 
         //执行请求
         json response = executeCurl(payload);
+        // Check for API error response first
+        if (response.contains("error") && response["error"].contains("message")) {
+            std::string errMsg = "[API Error] " + response["error"]["message"].get<std::string>();
+            addMessage(userId, userName, false, errMsg, sessionId);
+            return errMsg;
+        }
         std::string answer = strategy->parseResponse(response);
         addMessage(userId, userName, false, answer, sessionId);
-        return answer.empty() ? "[Error] 无法解析响应" : answer;
+        return answer.empty() ? "[Error] 无法解析响应: " + response.dump() : answer;
     }
     //说明支持MCP
     AIConfig config;

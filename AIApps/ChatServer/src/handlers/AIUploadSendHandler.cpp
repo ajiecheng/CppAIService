@@ -30,7 +30,7 @@ void AIUploadSendHandler::handle(const http::HttpRequest& req, http::HttpRespons
 
                 server_->ImageRecognizerMap.emplace(
                     userId,
-                    std::make_shared<ImageRecognizer>("/root/models/mobilenetv2/mobilenetv2-7.onnx")  //todo:Remove hard coding
+                    std::make_shared<ImageRecognizer>("AIApps/ChatServer/resource/mobilenetv2-7.onnx", "AIApps/ChatServer/resource/imagenet_classes.txt")  //todo:Remove hard coding
                 );
             }
             ImageRecognizerPtr = server_->ImageRecognizerMap[userId];

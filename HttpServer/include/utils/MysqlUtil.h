@@ -1,10 +1,19 @@
  #pragma once
  #include "db/DbConnectionPool.h"
- 
+
 #include <string>
+#include <memory>
 
 namespace http
 {
+
+struct QueryResult {
+    std::shared_ptr<db::DbConnection> conn;
+    sql::ResultSet* res;
+
+    sql::ResultSet* operator->() { return res; }
+    bool next() { return res->next(); }
+};
 
 class MysqlUtil
 {
@@ -18,10 +27,11 @@ public:
     }
 
     template<typename... Args>
-    sql::ResultSet* executeQuery(const std::string& sql, Args&&... args)
+    QueryResult executeQuery(const std::string& sql, Args&&... args)
     {
         auto conn = http::db::DbConnectionPool::getInstance().getConnection();
-        return conn->executeQuery(sql, std::forward<Args>(args)...);
+        sql::ResultSet* res = conn->executeQuery(sql, std::forward<Args>(args)...);
+        return QueryResult{conn, res};
     }
 
     template<typename... Args>

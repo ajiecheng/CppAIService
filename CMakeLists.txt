@@ -48,9 +48,7 @@ if(UNIX)
         )
     endif()
 
-    if(BUILD_WITH_ONNX)
-        include_directories(/usr/local/include)
-    endif()
+    include_directories(/usr/local/include)
 
     # Unix 的 OpenCV 系统路径（通常 find_package 已处理，但保留以防）
     include_directories(/usr/include/opencv4)
@@ -109,10 +107,13 @@ if(TARGET http_server)
             mysqlclient
             ssl
             crypto
-            ${ONNXRUNTIME_LIBRARY}        # 自动查找的 ONNX Runtime 库
-            SimpleAmqpClient
-            rabbitmq
         )
+        if(BUILD_WITH_ONNX AND ONNXRUNTIME_LIBRARY)
+            target_link_libraries(http_server ${ONNXRUNTIME_LIBRARY})
+        endif()
+        if(BUILD_WITH_AMQP)
+            target_link_libraries(http_server SimpleAmqpClient rabbitmq)
+        endif()
     endif()
 endif()
 

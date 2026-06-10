@@ -4,6 +4,7 @@
 #include <mutex>
 #include <cppconn/connection.h>
 #include <cppconn/prepared_statement.h>
+#include <cppconn/statement.h>
 #include <cppconn/resultset.h>
 #include <mysql_driver.h>
 #include <mysql/mysql.h>
@@ -36,16 +37,22 @@ public:
     sql::ResultSet* executeQuery(const std::string& sql, Args&&... args)
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        try 
+        try
         {
-            // 直接创建新的预处理语句，不使用缓存
-            std::unique_ptr<sql::PreparedStatement> stmt(
-                conn_->prepareStatement(sql)
-            );
-            bindParams(stmt.get(), 1, std::forward<Args>(args)...);
-            return stmt->executeQuery();
-        } 
-        catch (const sql::SQLException& e) 
+            if constexpr (sizeof...(Args) == 0) {
+                std::unique_ptr<sql::Statement> stmt(conn_->createStatement());
+                stmt->execute(sql);
+                stmt_ = std::move(stmt);
+                return stmt_->getResultSet();
+            } else {
+                std::unique_ptr<sql::PreparedStatement> pstmt(conn_->prepareStatement(sql));
+                bindParams(pstmt.get(), 1, std::forward<Args>(args)...);
+                sql::ResultSet* r = pstmt->executeQuery();
+                pstmt_ = std::move(pstmt);
+                return r;
+            }
+        }
+        catch (const sql::SQLException& e)
         {
             LOG_ERROR << "Query failed: " << e.what() << ", SQL: " << sql;
             throw DbException(e.what());
@@ -97,6 +104,8 @@ private:
 
 private:
     std::shared_ptr<sql::Connection> conn_;
+    std::unique_ptr<sql::Statement>  stmt_;
+    std::unique_ptr<sql::PreparedStatement> pstmt_;
     std::string                      host_;
     std::string                      user_;
     std::string                      password_;

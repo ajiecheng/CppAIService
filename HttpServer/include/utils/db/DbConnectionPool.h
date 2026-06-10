@@ -31,6 +31,9 @@ public:
     // 获取连接
     std::shared_ptr<DbConnection> getConnection();
 
+    // 归还连接到池中
+    void returnConnection(std::shared_ptr<DbConnection> conn);
+
 private:
     // 构造函数
     DbConnectionPool();
