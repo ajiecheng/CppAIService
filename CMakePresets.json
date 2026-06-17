@@ -1,0 +1,28 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "linux-debug",
+            "displayName": "Linux Debug (Ninja)",
+            "description": "使用 Ninja 构建器，Debug 模式",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_STANDARD": "17",
+                "BUILD_WITH_MUDUO": "ON",
+                "BUILD_WITH_MYSQL": "ON",
+                "BUILD_WITH_ONNX": "ON",
+                "BUILD_WITH_AMQP": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug",
+            "displayName": "构建 http_server",
+            "description": "编译整个项目的 Debug 版本"
+        }
+    ]
+}
