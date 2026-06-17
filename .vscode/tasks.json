@@ -1,0 +1,31 @@
+{
+    "tasks": [
+        {
+            "type": "cmake",
+            "label": "CMake: 配置",
+            "command": "configure",
+            "detail": "CMake 配置项目（Ninja / Debug）"
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: 构建",
+            "command": "build",
+            "targets": ["http_server"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "CMake 编译整个项目"
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: 清理重新构建",
+            "command": "cleanRebuild",
+            "targets": ["http_server"],
+            "problemMatcher": ["$gcc"],
+            "detail": "清理后重新编译"
+        }
+    ],
+    "version": "2.0.0"
+}

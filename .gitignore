@@ -1,0 +1,14 @@
+# 构建产物
+build/
+
+# 日志
+nohup.out
+
+# ONNX 模型文件（过大，从 Release 下载或自行下载）
+*.onnx
+
+# IDE 临时文件
+*.swp
+*.swo
+*~
+.DS_Store
